@@ -7,7 +7,6 @@ import lombok.Builder;
 public record UpdateCustomerRequest(
     String customerName,
     String telephone,
-    String email,
     String customerBirthday,
     CustomerStatus customerStatus
 ) {
