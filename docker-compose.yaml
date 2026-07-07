@@ -1,0 +1,161 @@
+version: "3.9"
+
+services:
+
+  eureka-server:
+    build:
+      context: ./infras/eureka-service
+      dockerfile: Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_APPLICATION_NAME: eureka-server
+      SERVER_PORT: 8761
+    networks:
+      - car-renting-network
+
+  api-gateway:
+    build:
+      context: ./infras/api-gateway
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - eureka-server
+    environment:
+      SPRING_APPLICATION_NAME: api-gateway
+      SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - car-renting-network
+
+  customer-db:
+    image: postgres:16
+    container_name: customer_db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    volumes:
+      - customer_db_data:/var/lib/posgresql/data
+
+  car-db:
+    image: postgres:16
+    container_name: car-db
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: car_db
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    volumes:
+      - car_db_data:/var/lib/postgresql/data
+    networks:
+      - car-renting-network
+
+  rental-db:
+    image: postgres:16
+    container_name: rental_db
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_DB: rental_db
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+    volumes:
+      - rental_db_data:/var/lib/postgresql/data
+    networks:
+      - car-renting-network
+
+  car-service:
+    build:
+      context: ./infras/car-service
+      dockerfile: Dockerfile
+    container_name: car-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      car-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: car-service
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://car-db:5432/car_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - car-renting-network
+
+  customer-service:
+    build:
+      context: ./customer-service
+      dockerfile: Dockerfile
+    container_name: customer-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      customer-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: customer-service
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://customer-db:5432/customer_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - car-renting-network
+
+  renting-service:
+    build:
+      context: ./renting-service
+      dockerfile: Dockerfile
+    container_name: renting-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      rental-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      customer-service:
+        condition: service_started
+      car-service:
+        condition: service_started
+    environment:
+      SPRING_APPLICATION_NAME: renting-service
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://rental-db:5432/rental_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    networks:
+      - car-renting-network
+
+volumes:
+  customer_db_data:
+  car_db_data:
+  rental_db_data:
+
+networks:
+  car-renting-network:
+    driver: bridge
+
+
+
+
