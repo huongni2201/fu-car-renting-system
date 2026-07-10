@@ -1,0 +1,12 @@
+eureka:
+  client:
+    enabled: false
+
+app:
+  admin:
+    email: admin@fu-car.com
+    password: admin123
+  jwt:
+    secret: fu-car-renting-system-secret-key-change-me
+    expiration-seconds: 86400
+  internal-secret: fu-car-internal-secret-change-me

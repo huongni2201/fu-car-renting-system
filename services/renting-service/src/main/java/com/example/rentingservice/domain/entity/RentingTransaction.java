@@ -10,6 +10,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -18,6 +23,11 @@ import java.util.List;
 
 @Entity
 @Table(name = "renting_transaction")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class RentingTransaction {
 
   @Id
@@ -38,5 +48,11 @@ public class RentingTransaction {
       cascade = CascadeType.ALL,
       orphanRemoval = true
   )
+  @Builder.Default
   private List<RentingDetail> rentingDetails = new ArrayList<>();
+
+  public void addRentingDetail(RentingDetail rentingDetail) {
+    rentingDetails.add(rentingDetail);
+    rentingDetail.setRentingTransaction(this);
+  }
 }

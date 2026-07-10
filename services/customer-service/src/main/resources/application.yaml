@@ -4,6 +4,17 @@ server:
 spring:
   application:
     name: customer-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/customer_db
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+app:
+  internal-secret: fu-car-internal-secret-change-me
 
 eureka:
   client:

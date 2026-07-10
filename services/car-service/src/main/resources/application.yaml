@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: car-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/car_db
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
 eureka:
   client:

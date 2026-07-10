@@ -66,7 +66,10 @@ public class CustomerService {
         .size(size)
         .page(page)
         .content(content)
+        .totalElements(customerPage.getTotalElements())
         .totalPages(customerPage.getTotalPages())
+        .first(customerPage.isFirst())
+        .last(customerPage.isLast())
         .build();
   }
 
@@ -101,7 +104,9 @@ public class CustomerService {
 
 
   public void deleteCustomer(Long customerId) {
-    Customer customer = customerRepository.getReferenceById(customerId);
+    Customer customer = customerRepository.findById(customerId).orElseThrow(
+        () -> new CustomerNotFoundException("Customer not found!")
+    );
 
     customerRepository.delete(customer);
   }

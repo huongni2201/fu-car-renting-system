@@ -46,3 +46,12 @@ eureka:
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
+
+app:
+  admin:
+    email: admin@fu-car.com
+    password: admin123
+  jwt:
+    secret: fu-car-renting-system-secret-key-change-me
+    expiration-seconds: 86400
+  internal-secret: fu-car-internal-secret-change-me

@@ -9,6 +9,7 @@ public class CustomerMapper {
 
   public CustomerResponse toCustomerResponse(Customer customer) {
     return CustomerResponse.builder()
+        .customerId(customer.getCustomerId())
         .customerName(customer.getCustomerName())
         .telephone(customer.getTelephone())
         .email(customer.getEmail())

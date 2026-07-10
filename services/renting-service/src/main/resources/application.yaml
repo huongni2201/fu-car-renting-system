@@ -4,6 +4,14 @@ server:
 spring:
   application:
     name: renting-service
+  datasource:
+    url: jdbc:postgresql://localhost:5435/rental_db
+    username: root
+    password: root
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
 
 eureka:
   client:
