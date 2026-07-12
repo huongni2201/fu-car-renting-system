@@ -45,12 +45,28 @@ public class RentingTransactionService {
   @Transactional
   public RentingTransactionResponse create(CreateRentingTransactionRequest request) {
     validateCreateRequest(request);
+    log.info("Creating renting transaction for customerId={} with {} renting details",
+        request.customerId(), request.rentingDetails().size());
+
+    // This call is a prerequisite check, not a Saga step. If the customer does not exist
+    // or is not ACTIVE, no car has been reserved yet, so there is nothing to compensate.
     customerClient.ensureActiveCustomer(request.customerId());
 
+    // A Saga cannot rely on @Transactional to roll back changes made in another service.
+    // The reservation token is the cross-service ownership marker: car-service stores it
+    // with each reserved car, and later release calls must provide the same token. This
+    // prevents one renting transaction from accidentally releasing a car reserved by another.
     String reservationToken = "renting-" + UUID.randomUUID();
+
+    // Track only cars that were successfully reserved. If a later reserve or local save
+    // fails, compensation must release exactly these cars and no others.
     List<Long> reservedCarIds = new ArrayList<>();
     try {
+      // Saga action phase: reserve all requested cars in car-service first. Each reserve
+      // changes the car-service database from AVAILABLE to RENTED, so every successful
+      // call needs a matching compensating release if this create flow cannot finish.
       for (Long carId : uniqueCarIds(request)) {
+        log.info("Reserving carId={} for reservationToken={}", carId, reservationToken);
         carClient.reserve(carId, reservationToken);
         reservedCarIds.add(carId);
       }
@@ -78,8 +94,19 @@ public class RentingTransactionService {
 
       transaction.setTotalPrice(totalPrice);
 
-      return toResponse(rentingTransactionRepository.save(transaction));
+      // The local transaction is saved only after all remote car reservations succeed.
+      // If this save fails, the catch block below compensates the already-reserved cars.
+      RentingTransaction savedTransaction = rentingTransactionRepository.save(transaction);
+      log.info("Created rentingTransactionId={} with reservationToken={}",
+          savedTransaction.getRentingTransactionId(), reservationToken);
+
+      return toResponse(savedTransaction);
     } catch (RuntimeException exception) {
+      // Saga compensation phase: @Transactional will roll back only renting-service data.
+      // It cannot undo car-service updates, so release every car that was reserved before
+      // the failure and then rethrow the original exception to return the correct API error.
+      log.warn("Create renting transaction failed for reservationToken={}. Compensating reserved cars={}",
+          reservationToken, reservedCarIds, exception);
       compensateReservedCars(reservedCarIds, reservationToken);
       throw exception;
     }
@@ -124,10 +151,16 @@ public class RentingTransactionService {
   @Transactional
   public void delete(Long id) {
     RentingTransaction transaction = findById(id);
+    log.info("Deleting rentingTransactionId={} with reservationToken={}", id, transaction.getReservationToken());
     String reservationToken = transaction.getReservationToken();
     if (reservationToken != null && !reservationToken.isBlank()) {
+      // Delete has a Saga-style cleanup step too: release the cars in car-service before
+      // deleting the local renting transaction. If release fails, keep the local record so
+      // the system still knows which cars must be released later.
       for (RentingDetail detail : transaction.getRentingDetails()) {
         try {
+          log.info("Releasing carId={} before deleting rentingTransactionId={}",
+              detail.getCarId(), id);
           carClient.release(detail.getCarId(), reservationToken);
         } catch (RuntimeException exception) {
           recordReleaseFailure(detail.getCarId(), reservationToken, exception);
@@ -137,6 +170,7 @@ public class RentingTransactionService {
     }
 
     rentingTransactionRepository.delete(transaction);
+    log.info("Deleted rentingTransactionId={}", id);
   }
 
   private RentingTransaction findById(Long id) {
@@ -180,9 +214,12 @@ public class RentingTransactionService {
   }
 
   private void compensateReservedCars(List<Long> reservedCarIds, String reservationToken) {
+    // Compensate in reverse order of the successful actions. This mirrors the standard
+    // Saga rollback approach: undo the most recent successful remote change first.
     for (int i = reservedCarIds.size() - 1; i >= 0; i--) {
       Long carId = reservedCarIds.get(i);
       try {
+        log.info("Compensating reservationToken={} by releasing carId={}", reservationToken, carId);
         carClient.release(carId, reservationToken);
       } catch (RuntimeException exception) {
         recordReleaseFailure(carId, reservationToken, exception);
@@ -193,6 +230,8 @@ public class RentingTransactionService {
   private void recordReleaseFailure(Long carId, String reservationToken, RuntimeException exception) {
     log.warn("Failed to release reserved car {} for token {}", carId, reservationToken, exception);
     try {
+      // Persist failed compensation in a separate transaction so the incident is not lost
+      // even when the create/delete transaction rolls back.
       compensationFailureService.recordReleaseFailure(carId, reservationToken, exception.getMessage());
     } catch (RuntimeException persistenceException) {
       log.error("Failed to persist compensation failure for car {} and token {}", carId, reservationToken, persistenceException);
