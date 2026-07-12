@@ -10,8 +10,12 @@ spring:
     password: root
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+
+app:
+  internal-secret: fu-car-internal-secret-change-me
 
 eureka:
   client:

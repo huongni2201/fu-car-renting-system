@@ -24,18 +24,6 @@ spring:
               uri: lb://renting-service
               predicates:
                 - Path=/api/v1/rentings/**
-
-            - id: manufacturer-service
-              uri: lb://manufacturer-service
-              predicates:
-                - Path=/api/v1/manufacturers/**
-
-            - id: supplier-service
-              uri: lb://supplier-service
-              predicates:
-                - Path=/api/v1/suppliers/**
-
-
 eureka:
   client:
     service-url:

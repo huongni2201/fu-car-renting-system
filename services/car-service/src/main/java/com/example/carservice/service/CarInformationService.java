@@ -4,6 +4,7 @@ import com.example.carservice.domain.entity.CarInformation;
 import com.example.carservice.domain.entity.Manufacturer;
 import com.example.carservice.domain.entity.Supplier;
 import com.example.carservice.domain.enums.CarStatus;
+import com.example.carservice.dto.request.CarReservationRequest;
 import com.example.carservice.dto.request.CarInformationRequest;
 import com.example.carservice.dto.response.CarInformationResponse;
 import com.example.carservice.dto.response.PageResponse;
@@ -15,10 +16,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -30,6 +33,8 @@ public class CarInformationService {
   private final SupplierRepository supplierRepository;
 
   public CarInformationResponse create(CarInformationRequest request) {
+    validateRequestBody(request);
+
     CarInformation carInformation = CarInformation.builder()
         .carName(request.carName())
         .carDescription(request.carDescription())
@@ -46,6 +51,8 @@ public class CarInformationService {
   }
 
   public PageResponse<CarInformationResponse> getCars(int page, int size) {
+    validatePageRequest(page, size);
+
     Pageable pageable = PageRequest.of(page, size);
     Page<CarInformation> carPage = carInformationRepository.findAll(pageable);
 
@@ -69,7 +76,38 @@ public class CarInformationService {
     return toResponse(findCar(id));
   }
 
+  @Transactional
+  public void reserve(Long id, CarReservationRequest request) {
+    String reservationToken = validateReservationRequest(request);
+    CarInformation carInformation = findCarForUpdate(id);
+    if (carInformation.getCarStatus() != CarStatus.AVAILABLE) {
+      throw new ResponseStatusException(BAD_REQUEST, "Car is not available");
+    }
+
+    carInformation.setCarStatus(CarStatus.RENTED);
+    carInformation.setReservationToken(reservationToken);
+    carInformationRepository.save(carInformation);
+  }
+
+  @Transactional
+  public void release(Long id, CarReservationRequest request) {
+    String reservationToken = validateReservationRequest(request);
+    CarInformation carInformation = findCarForUpdate(id);
+    if (carInformation.getCarStatus() != CarStatus.RENTED) {
+      return;
+    }
+    if (!reservationToken.equals(carInformation.getReservationToken())) {
+      throw new ResponseStatusException(BAD_REQUEST, "Reservation token does not own this car");
+    }
+
+    carInformation.setCarStatus(CarStatus.AVAILABLE);
+    carInformation.setReservationToken(null);
+    carInformationRepository.save(carInformation);
+  }
+
   public CarInformationResponse update(Long id, CarInformationRequest request) {
+    validateRequestBody(request);
+
     CarInformation carInformation = findCar(id);
 
     if (request.carName() != null) {
@@ -112,6 +150,11 @@ public class CarInformationService {
         .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Car not found"));
   }
 
+  private CarInformation findCarForUpdate(Long id) {
+    return carInformationRepository.findByIdForUpdate(id)
+        .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Car not found"));
+  }
+
   private Manufacturer findManufacturer(Long id) {
     if (id == null) {
       return null;
@@ -128,6 +171,26 @@ public class CarInformationService {
 
     return supplierRepository.findById(id)
         .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Supplier not found"));
+  }
+
+  private void validateRequestBody(CarInformationRequest request) {
+    if (request == null) {
+      throw new ResponseStatusException(BAD_REQUEST, "Request body is required");
+    }
+  }
+
+  private String validateReservationRequest(CarReservationRequest request) {
+    if (request == null || request.reservationToken() == null || request.reservationToken().isBlank()) {
+      throw new ResponseStatusException(BAD_REQUEST, "reservationToken is required");
+    }
+
+    return request.reservationToken();
+  }
+
+  private void validatePageRequest(int page, int size) {
+    if (page < 0 || size <= 0 || size > 100) {
+      throw new ResponseStatusException(BAD_REQUEST, "page must be >= 0 and size must be between 1 and 100");
+    }
   }
 
   private CarInformationResponse toResponse(CarInformation carInformation) {

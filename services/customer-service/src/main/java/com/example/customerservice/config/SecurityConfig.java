@@ -29,7 +29,7 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(authorize -> authorize
             .requestMatchers(HttpMethod.POST, "/api/v1/customers/register").permitAll()
-            .requestMatchers("/internal/auth/**").permitAll()
+            .requestMatchers("/internal/**").permitAll()
             .anyRequest().authenticated()
         )
         .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

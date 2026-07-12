@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,7 +32,7 @@ public class RentingTransactionController {
   private final RentingTransactionService rentingTransactionService;
 
   @PostMapping
-  @PreAuthorize("hasAuthority('ADMIN') or (hasAuthority('CUSTOMER') and @securityExpression.isCurrentUser(#request.customerId(), authentication))")
+  @PreAuthorize("hasAuthority('ADMIN') or (hasAuthority('CUSTOMER') and #request != null and @securityExpression.isCurrentUser(#request.customerId(), authentication))")
   public ResponseEntity<RentingTransactionResponse> create(
       @RequestBody CreateRentingTransactionRequest request
   ) {
@@ -40,8 +41,11 @@ public class RentingTransactionController {
 
   @GetMapping("/{id}")
   @PreAuthorize("hasAnyAuthority('ADMIN', 'CUSTOMER')")
-  public ResponseEntity<RentingTransactionResponse> getById(@PathVariable Long id) {
-    return ResponseEntity.ok(rentingTransactionService.getById(id));
+  public ResponseEntity<RentingTransactionResponse> getById(
+      @PathVariable Long id,
+      Authentication authentication
+  ) {
+    return ResponseEntity.ok(rentingTransactionService.getById(id, authentication));
   }
 
   @GetMapping("/customers/{customerId}")

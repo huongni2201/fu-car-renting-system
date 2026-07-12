@@ -29,6 +29,7 @@ public class SecurityConfig {
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(authorize -> authorize
             .requestMatchers(HttpMethod.GET, "/api/v1/cars/**").permitAll()
+            .requestMatchers("/internal/**").permitAll()
             .anyRequest().authenticated()
         )
         .addFilterBefore(headerAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

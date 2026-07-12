@@ -45,6 +45,8 @@ public class CarInformation {
   @Enumerated(EnumType.STRING)
   private CarStatus carStatus;
 
+  private String reservationToken;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "manufacturer_id")
   private Manufacturer manufacturer;

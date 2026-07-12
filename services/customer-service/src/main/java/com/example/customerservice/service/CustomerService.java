@@ -17,8 +17,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,8 @@ public class CustomerService {
   private final CustomerRepository customerRepository;
 
   public CustomerResponse createCustomer(CreateCustomerRequest request) {
+    validateCreateRequest(request);
+
     if (customerRepository.existsByEmail(request.email())) {
       throw new EmailExistedException("Email already exists");
     }
@@ -51,7 +57,21 @@ public class CustomerService {
     return customerMapper.toCustomerResponse(savedCustomer);
   }
 
+  public CustomerResponse registerCustomer(CreateCustomerRequest request) {
+    validateCreateRequest(request);
+
+    return createCustomer(CreateCustomerRequest.builder()
+        .customerName(request.customerName())
+        .telephone(request.telephone())
+        .email(request.email())
+        .customerBirthday(request.customerBirthday())
+        .customerStatus(CustomerStatus.ACTIVE)
+        .password(request.password())
+        .build());
+  }
+
   public PageResponse<CustomerResponse> getCustomers(int page, int size) {
+    validatePageRequest(page, size);
 
     Pageable pageable = PageRequest.of(page, size, Sort.unsorted());
 
@@ -80,6 +100,8 @@ public class CustomerService {
   }
 
   public CustomerResponse update(Long customerId, UpdateCustomerRequest request) {
+    validateUpdateRequest(request);
+
     Customer customer = customerRepository.findById(customerId).orElseThrow(
         () -> new CustomerNotFoundException("Customer not found!")
     );
@@ -102,6 +124,36 @@ public class CustomerService {
     return customerMapper.toCustomerResponse(savedCustomer);
   }
 
+  public CustomerResponse updateProfile(Long customerId, UpdateCustomerRequest request) {
+    validateUpdateRequest(request);
+
+    Customer customer = customerRepository.findById(customerId).orElseThrow(
+        () -> new CustomerNotFoundException("Customer not found!")
+    );
+
+    if (request.customerName() != null) {
+      customer.setCustomerName(request.customerName());
+    }
+    if (request.customerBirthday() != null) {
+      customer.setCustomerBirthday(request.customerBirthday());
+    }
+    if (request.telephone() != null) {
+      customer.setTelephone(request.telephone());
+    }
+
+    return customerMapper.toCustomerResponse(customerRepository.save(customer));
+  }
+
+  public void ensureActiveCustomer(Long customerId) {
+    Customer customer = customerRepository.findById(customerId).orElseThrow(
+        () -> new CustomerNotFoundException("Customer not found!")
+    );
+
+    if (customer.getCustomerStatus() != CustomerStatus.ACTIVE) {
+      throw new ResponseStatusException(FORBIDDEN, "Customer is not active");
+    }
+  }
+
 
   public void deleteCustomer(Long customerId) {
     Customer customer = customerRepository.findById(customerId).orElseThrow(
@@ -109,5 +161,30 @@ public class CustomerService {
     );
 
     customerRepository.delete(customer);
+  }
+
+  private void validateCreateRequest(CreateCustomerRequest request) {
+    if (request == null
+        || isBlank(request.customerName())
+        || isBlank(request.email())
+        || isBlank(request.password())) {
+      throw new ResponseStatusException(BAD_REQUEST, "customerName, email and password are required");
+    }
+  }
+
+  private void validateUpdateRequest(UpdateCustomerRequest request) {
+    if (request == null) {
+      throw new ResponseStatusException(BAD_REQUEST, "Request body is required");
+    }
+  }
+
+  private void validatePageRequest(int page, int size) {
+    if (page < 0 || size <= 0 || size > 100) {
+      throw new ResponseStatusException(BAD_REQUEST, "page must be >= 0 and size must be between 1 and 100");
+    }
+  }
+
+  private boolean isBlank(String value) {
+    return value == null || value.isBlank();
   }
 }

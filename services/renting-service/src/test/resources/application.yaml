@@ -8,3 +8,11 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: false
+    open-in-view: false
+
+eureka:
+  client:
+    enabled: false
+
+app:
+  internal-secret: fu-car-internal-secret-change-me

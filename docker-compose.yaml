@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   eureka-server:
@@ -41,7 +39,14 @@ services:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: root
     volumes:
-      - customer_db_data:/var/lib/posgresql/data
+      - customer_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d customer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - car-renting-network
 
   car-db:
     image: postgres:16
@@ -54,6 +59,11 @@ services:
       POSTGRES_PASSWORD: root
     volumes:
       - car_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d car_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - car-renting-network
 
@@ -68,16 +78,21 @@ services:
       POSTGRES_PASSWORD: root
     volumes:
       - rental_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d rental_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - car-renting-network
 
   car-service:
     build:
-      context: ./infras/car-service
+      context: ./services/car-service
       dockerfile: Dockerfile
     container_name: car-service
-    ports:
-      - "8082:8082"
+    expose:
+      - "8082"
     depends_on:
       car-db:
         condition: service_healthy
@@ -89,19 +104,20 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://car-db:5432/car_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "false"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:-fu-car-internal-secret-change-me}
     networks:
       - car-renting-network
 
   customer-service:
     build:
-      context: ./customer-service
+      context: ./services/customer-service
       dockerfile: Dockerfile
     container_name: customer-service
-    ports:
-      - "8081:8081"
+    expose:
+      - "8081"
     depends_on:
       customer-db:
         condition: service_healthy
@@ -113,19 +129,20 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://customer-db:5432/customer_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "false"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:-fu-car-internal-secret-change-me}
     networks:
       - car-renting-network
 
   renting-service:
     build:
-      context: ./renting-service
+      context: ./services/renting-service
       dockerfile: Dockerfile
     container_name: renting-service
-    ports:
-      - "8083:8083"
+    expose:
+      - "8083"
     depends_on:
       rental-db:
         condition: service_healthy
@@ -141,9 +158,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://rental-db:5432/rental_db
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "false"
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      APP_INTERNAL_SECRET: ${APP_INTERNAL_SECRET:-fu-car-internal-secret-change-me}
     networks:
       - car-renting-network
 

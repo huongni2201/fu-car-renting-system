@@ -40,6 +40,8 @@ public class RentingTransaction {
 
   private Long customerId;
 
+  private String reservationToken;
+
   @Enumerated(EnumType.STRING)
   private RentingStatus rentingStatus;
 

@@ -62,7 +62,7 @@ public class CustomerController {
   public ResponseEntity<CustomerResponse> register(
       @RequestBody CreateCustomerRequest request
   ) {
-    return ResponseEntity.ok(customerService.createCustomer(request));
+    return ResponseEntity.ok(customerService.registerCustomer(request));
   }
 
   @GetMapping("/profile/{id}")
@@ -77,7 +77,7 @@ public class CustomerController {
       @PathVariable("id") Long id,
       @RequestBody UpdateCustomerRequest request
   ) {
-    return ResponseEntity.ok(customerService.update(id, request));
+    return ResponseEntity.ok(customerService.updateProfile(id, request));
   }
 
   @DeleteMapping("/{id}")
