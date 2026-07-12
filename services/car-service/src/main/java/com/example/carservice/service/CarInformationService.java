@@ -12,6 +12,7 @@ import com.example.carservice.repository.CarInformationRepository;
 import com.example.carservice.repository.ManufacturerRepository;
 import com.example.carservice.repository.SupplierRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,14 +27,18 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CarInformationService {
 
   private final CarInformationRepository carInformationRepository;
   private final ManufacturerRepository manufacturerRepository;
   private final SupplierRepository supplierRepository;
 
+  @Transactional
   public CarInformationResponse create(CarInformationRequest request) {
     validateRequestBody(request);
+    log.info("Creating car name={}, manufacturerId={}, supplierId={}",
+        request.carName(), request.manufacturerId(), request.supplierId());
 
     CarInformation carInformation = CarInformation.builder()
         .carName(request.carName())
@@ -47,11 +52,15 @@ public class CarInformationService {
         .supplier(findSupplier(request.supplierId()))
         .build();
 
-    return toResponse(carInformationRepository.save(carInformation));
+    CarInformation savedCar = carInformationRepository.save(carInformation);
+    log.info("Created car id={}", savedCar.getCarId());
+    return toResponse(savedCar);
   }
 
+  @Transactional(readOnly = true)
   public PageResponse<CarInformationResponse> getCars(int page, int size) {
     validatePageRequest(page, size);
+    log.debug("Fetching cars page={} size={}", page, size);
 
     Pageable pageable = PageRequest.of(page, size);
     Page<CarInformation> carPage = carInformationRepository.findAll(pageable);
@@ -72,13 +81,16 @@ public class CarInformationService {
         .build();
   }
 
+  @Transactional(readOnly = true)
   public CarInformationResponse getById(Long id) {
+    log.debug("Fetching car id={}", id);
     return toResponse(findCar(id));
   }
 
   @Transactional
   public void reserve(Long id, CarReservationRequest request) {
     String reservationToken = validateReservationRequest(request);
+    log.info("Reserving car id={} token={}", id, reservationToken);
     CarInformation carInformation = findCarForUpdate(id);
     if (carInformation.getCarStatus() != CarStatus.AVAILABLE) {
       throw new ResponseStatusException(BAD_REQUEST, "Car is not available");
@@ -87,13 +99,16 @@ public class CarInformationService {
     carInformation.setCarStatus(CarStatus.RENTED);
     carInformation.setReservationToken(reservationToken);
     carInformationRepository.save(carInformation);
+    log.info("Reserved car id={} token={}", id, reservationToken);
   }
 
   @Transactional
   public void release(Long id, CarReservationRequest request) {
     String reservationToken = validateReservationRequest(request);
+    log.info("Releasing car id={} token={}", id, reservationToken);
     CarInformation carInformation = findCarForUpdate(id);
     if (carInformation.getCarStatus() != CarStatus.RENTED) {
+      log.info("Skip release car id={} because status={}", id, carInformation.getCarStatus());
       return;
     }
     if (!reservationToken.equals(carInformation.getReservationToken())) {
@@ -103,10 +118,13 @@ public class CarInformationService {
     carInformation.setCarStatus(CarStatus.AVAILABLE);
     carInformation.setReservationToken(null);
     carInformationRepository.save(carInformation);
+    log.info("Released car id={} token={}", id, reservationToken);
   }
 
+  @Transactional
   public CarInformationResponse update(Long id, CarInformationRequest request) {
     validateRequestBody(request);
+    log.info("Updating car id={}", id);
 
     CarInformation carInformation = findCar(id);
 
@@ -138,11 +156,16 @@ public class CarInformationService {
       carInformation.setSupplier(findSupplier(request.supplierId()));
     }
 
-    return toResponse(carInformationRepository.save(carInformation));
+    CarInformation savedCar = carInformationRepository.save(carInformation);
+    log.info("Updated car id={}", savedCar.getCarId());
+    return toResponse(savedCar);
   }
 
+  @Transactional
   public void delete(Long id) {
+    log.info("Deleting car id={}", id);
     carInformationRepository.delete(findCar(id));
+    log.info("Deleted car id={}", id);
   }
 
   private CarInformation findCar(Long id) {

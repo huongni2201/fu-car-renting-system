@@ -17,6 +17,10 @@ spring:
 app:
   internal-secret: fu-car-internal-secret-change-me
 
+logging:
+  level:
+    com.example.carservice: DEBUG
+
 eureka:
   client:
     service-url:
