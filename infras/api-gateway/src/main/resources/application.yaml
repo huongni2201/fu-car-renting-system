@@ -37,8 +37,8 @@ eureka:
 
 app:
   admin:
-    email: admin@fu-car.com
-    password: admin123
+    email: admin@example.com
+    password: admin
   jwt:
     secret: fu-car-renting-system-secret-key-change-me
     expiration-seconds: 86400

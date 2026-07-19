@@ -35,7 +35,7 @@ public class AuthenticationService {
 
   public Mono<LoginResponse> login(LoginRequest request) {
     if (adminEmail.equalsIgnoreCase(request.email()) && adminPassword.equals(request.password())) {
-      AuthenticatedUser admin = new AuthenticatedUser(null, adminEmail, "Administrator", "ADMIN");
+      AuthenticatedUser admin = new AuthenticatedUser(1L, adminEmail, "System Administrator", "ADMIN");
       return Mono.just(toLoginResponse(admin));
     }
 
